@@ -41,8 +41,8 @@ JWT_API_BASE = "https://jwtyunus.vercel.app/token"   #JWT API BY JAHID X EMPIRE
 # =============================================
 
 BD_CREDS = {
-    "uid": "18936380705", 
-    "password": "123456789_HV4X1_BY_DIVAN_SINGH_2BMK8"
+    "uid": "8372419245", 
+    "password": "78D24673FD0C25EBE378D1ABFABA8F4EB2B0F27BCA4E5BFC87F7CDCA129EB1D9"
 }
 
 IND_CREDS = {
