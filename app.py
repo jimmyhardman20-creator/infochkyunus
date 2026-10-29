@@ -34,7 +34,7 @@ MAIN_IV = b'6oyZDr22E3ychjM%'
 # JWT TOKEN API
 # =============================================
 
-JWT_API_BASE = "https://jwt-wxun.vercel.app/token"   #JWT API BY JAHID X EMPIRE 
+JWT_API_BASE = "https://jwtyunus.vercel.app/token"   #JWT API BY JAHID X EMPIRE 
 
 # =============================================
 # ACCOUNTS FOR JWT
