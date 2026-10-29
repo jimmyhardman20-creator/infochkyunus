@@ -34,15 +34,15 @@ MAIN_IV = b'6oyZDr22E3ychjM%'
 # JWT TOKEN API
 # =============================================
 
-JWT_API_BASE = "https://jwtyunus.vercel.app/token"   #JWT API BY JAHID X EMPIRE 
+JWT_API_BASE = "https://infoboka.vercel.app/token"   #JWT API BY JAHID X EMPIRE 
 
 # =============================================
 # ACCOUNTS FOR JWT
 # =============================================
 
 BD_CREDS = {
-    "uid": "8372419245", 
-    "password": "78D24673FD0C25EBE378D1ABFABA8F4EB2B0F27BCA4E5BFC87F7CDCA129EB1D9"
+    "uid": "4154906111", 
+    "password": "7BC23AA30150C95046701844CD8863512284E01994571A6AC26A516F1A8D16A8"
 }
 
 IND_CREDS = {
