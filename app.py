@@ -27,6 +27,10 @@ except Exception as e:  # don't sys.exit on Vercel - it kills the function
 # =============================================
 RELEASEVERSION = os.environ.get("FF_RELEASE_VERSION", "OB55")
 USERAGENT = "Dalvik/2.1.0 (Linux; U; Android 14; CPH2095 Build/RKQ1.211119.001)"
+# OB55 real client theke (capture): client 1.132.13, Unity 2018.4.12f1
+CLIENT_VERSION = os.environ.get("FF_CLIENT_VERSION", "1.132.13")
+UNITY_VERSION = os.environ.get("FF_UNITY_VERSION", "2018.4.12f1")
+GAME_UA = f"UnityPlayer/{UNITY_VERSION} (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
 MAIN_KEY = b'Yg&tc%DEuh6%Zc^8'
 MAIN_IV = b'6oyZDr22E3ychjM%'
 
@@ -96,19 +100,103 @@ def dict_to_proto(data: dict, proto_message) -> bytes:
 def valid_url(u):
     return isinstance(u, str) and u.startswith("http")
 
-def ff_headers(token=None):
+def ff_headers(token=None, login=False):
     h = {
-        'User-Agent': USERAGENT,
+        'User-Agent': USERAGENT if login else GAME_UA,
         'Connection': "Keep-Alive",
-        'Accept-Encoding': "gzip",
-        'Content-Type': "application/octet-stream",
-        'X-Unity-Version': "2018.4.11f1",
+        'Accept': "*/*",
+        'Accept-Encoding': "deflate, gzip",
+        'Content-Type': "application/x-www-form-urlencoded" if not login else "application/octet-stream",
+        'X-Unity-Version': UNITY_VERSION,
         'X-GA': "v1 1",
         'ReleaseVersion': RELEASEVERSION,
     }
     if token:
         h['Authorization'] = token
+        h['X-GA-SV'] = str(int(time.time()))
     return h
+
+# =============================================
+# Raw protobuf encoder (MajorLogin OB55 payload e 60+ field, proto file e nai)
+# =============================================
+def _varint(n: int) -> bytes:
+    n &= (1 << 64) - 1
+    out = bytearray()
+    while True:
+        b = n & 0x7F
+        n >>= 7
+        if n:
+            out.append(b | 0x80)
+        else:
+            out.append(b)
+            return bytes(out)
+
+def pb_encode(fields: dict) -> bytes:
+    out = bytearray()
+    for num in sorted(fields, key=int):
+        v = fields[num]
+        num = int(num)
+        if isinstance(v, bool):
+            v = int(v)
+        if isinstance(v, int):
+            out += _varint(num << 3) + _varint(v)
+        else:
+            b = pb_encode(v) if isinstance(v, dict) else (v if isinstance(v, bytes) else str(v).encode())
+            out += _varint((num << 3) | 2) + _varint(len(b)) + b
+    return bytes(out)
+
+def major_login_payload(open_id: str, access_token: str) -> bytes:
+    """OB55 real client er login payload (device info generic kora)."""
+    import uuid
+    from datetime import datetime as _dt
+    return pb_encode({
+        3: _dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+        4: "free fire",
+        5: 1,
+        7: CLIENT_VERSION,
+        8: "Android OS 14 / API-34 (UP1A.231005.007/T505NXXS4CXF1)",
+        9: "Handheld",
+        10: "Jio",
+        11: "WIFI",
+        12: 2400,
+        13: 1080,
+        14: "400",
+        15: "ARM64 FP ASIMD AES | 2200 | 8",
+        16: 7612,
+        17: "Adreno (TM) 642L",
+        18: "OpenGL ES 3.2 V@0502.0",
+        19: f"Google|{uuid.uuid4()}",
+        20: "103.120.10.10",
+        21: "en",
+        22: open_id,
+        23: "4",
+        24: "Handheld",
+        25: "samsung SM-A525F",
+        29: access_token,
+        30: 1,
+        41: "Jio",
+        42: "WIFI",
+        57: "7428b253defc164018c604a1ebbfebdf",
+        60: 114357, 61: 44031, 62: 639, 64: 44555, 65: 114357, 66: 44555, 67: 114357,
+        73: 3,
+        74: "/data/app/~~TkA4r3HTgUB3TyTQDnSLVg==/com.dts.freefireth-3FcQpaMtijSJxpvJy4yoWg==/lib/arm64",
+        76: 1,
+        77: "b8e0cd5e295eee42f5860d3c86e483dd|/data/app/~~TkA4r3HTgUB3TyTQDnSLVg==/com.dts.freefireth-3FcQpaMtijSJxpvJy4yoWg==/base.apk",
+        78: 3,
+        79: 2,
+        81: "64",
+        83: "2019121229",
+        85: 3,
+        86: "OpenGLES2",
+        87: 3071,
+        88: 4,
+        92: 10843,
+        93: "android",
+        95: 111107,
+        96: '{"cur_rate":[60,30,90,120],"support_etc2":false}',
+        99: "4",
+        100: "4",
+    })
 
 # =============================================
 # Token
@@ -153,12 +241,11 @@ async def token_backup(client, region, cred, errors):
             errors.append(f"{region}: guest grant empty")
             return None
 
-        body = dict_to_proto({"open_id": open_id, "open_id_type": "4", "login_token": access_token,
-                              "orign_platform_type": "4"}, FreeFire_pb2.LoginReq())
+        body = major_login_payload(open_id, access_token)
         r = await client.post(f"{LOGIN_URL}/MajorLogin", content=aes_cbc_encrypt(body),
-                              headers=ff_headers(), timeout=6)
+                              headers=ff_headers(login=True), timeout=6)
         if r.status_code != 200:
-            errors.append(f"{region}: MajorLogin HTTP {r.status_code} (OB version thik ache?)")
+            errors.append(f"{region}: MajorLogin HTTP {r.status_code} {r.text[:80]!r}")
             return None
         res = FreeFire_pb2.LoginRes()
         res.ParseFromString(r.content)
@@ -198,7 +285,8 @@ async def get_token(client, region, cred, errors, force=False):
 RATE_LIMITED = "rate_limited"
 
 async def fetch_player(client, uid, region, errors, deadline):
-    payload = aes_cbc_encrypt(dict_to_proto({'a': uid, 'b': '7'}, main_pb2.GetPlayerPersonalShow()))
+    # real OB55 client body: {1: uid, 2: 7, 4: 1, 5: 1}
+    payload = aes_cbc_encrypt(pb_encode({1: uid, 2: 7, 4: 1, 5: 1}))
     accounts = ACCOUNTS.get(region, [])
     now = time.time()
     usable = [c for c in accounts if _cooldown.get(f"{region}:{c['uid']}", 0) <= now]
